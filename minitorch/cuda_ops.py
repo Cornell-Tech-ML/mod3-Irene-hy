@@ -174,8 +174,29 @@ def tensor_map(
         in_index = cuda.local.array(MAX_DIMS, numba.int32)
         i = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
         # TODO: Implement for Task 3.3.
-        raise NotImplementedError("Need to implement for Task 3.3")
+        #raise NotImplementedError("Need to implement for Task 3.3")
+        if i < out_size:
+            linear_index = i
+            for dim in range(len(out_shape) - 1, -1, -1):
+                out_index[dim] = linear_index % out_shape[dim]
+                linear_index //= out_shape[dim]
+                
+            for dim in range(len(in_shape)):
+                if dim < len(out_shape) and out_shape[dim] == in_shape[dim]:
+                    in_index[dim] = out_index[dim]
+                else:
+                    in_index[dim] = 0
+                    
+            out_pos = 0
+            in_pos = 0
+            for dim in range(len(out_shape)):
+                out_pos += out_index[dim] * out_strides[dim]
+            for dim in range(len(in_shape)):
+                in_pos += in_index[dim] * in_strides[dim]
 
+            # Apply the function
+            out[out_pos] = fn(in_storage[in_pos])
+      
     return cuda.jit()(_map)  # type: ignore
 
 
