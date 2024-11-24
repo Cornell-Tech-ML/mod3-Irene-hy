@@ -591,22 +591,22 @@ def _tensor_matrix_multiply(
     result = 0.0
 
     # Move across shared dimension in tiles of BLOCK_DIM
+    a_shared[pi, pj] = 0.0
     for tile in range((a_shape[-1] + BLOCK_DIM - 1) // BLOCK_DIM):
         # Load a tile of A into shared memory
         if i < a_shape[-2] and tile * BLOCK_DIM + pj < a_shape[-1]:
             a_shared[pi, pj] = a_storage[
                 batch * a_batch_stride + i * a_strides[1] + tile * BLOCK_DIM + pj
             ]
-        else:
-            a_shared[pi, pj] = 0.0
+            
 
         # Load a tile of B into shared memory
+        b_shared[pi, pj] = 0.0
         if j < b_shape[-1] and tile * BLOCK_DIM + pi < b_shape[-2]:
             b_shared[pi, pj] = b_storage[
                 batch * b_batch_stride + (tile * BLOCK_DIM + pi) * b_strides[1] + j
             ]
-        else:
-            b_shared[pi, pj] = 0.0
+            
 
         # Synchronize to ensure tiles are fully loaded
         cuda.syncthreads()
@@ -616,7 +616,7 @@ def _tensor_matrix_multiply(
             result += a_shared[pi, n] * b_shared[n, pj]
 
         # Synchronize before loading the next tile
-        cuda.syncthreads()
+        #cuda.syncthreads()
 
     # Write the final result to global memory
     if i < out_shape[-2] and j < out_shape[-1]:
