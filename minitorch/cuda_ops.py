@@ -613,7 +613,7 @@ def _tensor_matrix_multiply(
             b_shared[pi, pj] = 0.0
 
         # Synchronize threads after loading tiles
-        cuda.syncthreads()
+        #cuda.syncthreads()
 
         # Compute partial dot product for the tile
         for k in range(BLOCK_DIM):
