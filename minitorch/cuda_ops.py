@@ -591,43 +591,35 @@ def _tensor_matrix_multiply(
     result = 0.0
 
     # Move across shared dimension in tiles of BLOCK_DIM
-    for tile_idx in range(0, a_shape[-1], BLOCK_DIM):
-        # Load A tile into shared memory
-        if i < out_shape[-2] and tile_idx + pj < a_shape[-1]:
+    for tile in range((a_shape[-1] + BLOCK_DIM - 1) // BLOCK_DIM):
+        # Load a tile of A into shared memory
+        if i < a_shape[-2] and tile * BLOCK_DIM + pj < a_shape[-1]:
             a_shared[pi, pj] = a_storage[
-                batch * a_batch_stride
-                + i * a_strides[-2]
-                + (tile_idx + pj) * a_strides[-1]
+                batch * a_batch_stride + i * a_strides[1] + tile * BLOCK_DIM + pj
             ]
         else:
             a_shared[pi, pj] = 0.0
 
-        # Load B tile into shared memory
-        if tile_idx + pi < b_shape[-2] and j < out_shape[-1]:
+        # Load a tile of B into shared memory
+        if j < b_shape[-1] and tile * BLOCK_DIM + pi < b_shape[-2]:
             b_shared[pi, pj] = b_storage[
-                batch * b_batch_stride
-                + (tile_idx + pi) * b_strides[-2]
-                + j * b_strides[-1]
+                batch * b_batch_stride + (tile * BLOCK_DIM + pi) * b_strides[1] + j
             ]
         else:
             b_shared[pi, pj] = 0.0
 
-        # Synchronize threads after loading tiles
+        # Synchronize to ensure tiles are fully loaded
         cuda.syncthreads()
 
-        # Compute partial dot product for the tile
-        for k in range(BLOCK_DIM):
-            result += a_shared[pi, k] * b_shared[k, pj]
+        # Compute partial dot product for this tile
+        for n in range(BLOCK_DIM):
+            result += a_shared[pi, n] * b_shared[n, pj]
 
-        # Synchronize threads before loading the next tile
+        # Synchronize before loading the next tile
         cuda.syncthreads()
 
-    # Write the result to the global memory
+    # Write the final result to global memory
     if i < out_shape[-2] and j < out_shape[-1]:
-        out[
-            batch * out_strides[0]
-            + i * out_strides[-2]
-            + j * out_strides[-1]
-        ] = result
+        out[batch * out_strides[0] + i * out_strides[1] + j] = result
 
 tensor_matrix_multiply = jit(_tensor_matrix_multiply)
