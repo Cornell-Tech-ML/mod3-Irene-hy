@@ -587,7 +587,8 @@ def _tensor_matrix_multiply(
     #raise NotImplementedError("Need to implement for Task 3.4")
 
 
-    
+    # Initialize the result for C[i, j]
+    result = 0.0
 
     # Move across shared dimension in tiles of BLOCK_DIM
     for tile_idx in range(0, a_shape[-1], BLOCK_DIM):
@@ -614,8 +615,6 @@ def _tensor_matrix_multiply(
         # Synchronize threads after loading tiles
         cuda.syncthreads()
 
-        # Initialize the result for C[i, j]
-        result = 0
         # Compute partial dot product for the tile
         for k in range(BLOCK_DIM):
             result += a_shared[pi, k] * b_shared[k, pj]
