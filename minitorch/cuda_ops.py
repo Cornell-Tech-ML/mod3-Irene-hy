@@ -476,8 +476,8 @@ def _mm_practice(out: Storage, a: Storage, b: Storage, size: int) -> None:
     #raise NotImplementedError("Need to implement for Task 3.3")
 
     # Shared memory for A and B matrices
-    a_shared = cuda.shared.array((BLOCK_DIM, BLOCK_DIM), numba.float64)
-    b_shared = cuda.shared.array((BLOCK_DIM, BLOCK_DIM), numba.float64)
+    a_shared = cuda.shared.array((BLOCK_DIM, BLOCK_DIM), numba.float32)
+    b_shared = cuda.shared.array((BLOCK_DIM, BLOCK_DIM), numba.float32)
 
     # Thread indices
     tx = cuda.threadIdx.x
