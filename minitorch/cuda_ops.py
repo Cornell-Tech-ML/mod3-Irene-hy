@@ -175,23 +175,18 @@ def tensor_map(
         i = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
         # TODO: Implement for Task 3.3.
         #raise NotImplementedError("Need to implement for Task 3.3")
-        local_idx = cuda.threadIdx.x
-
-        # Each thread loads its data into shared memory if within bounds
         if i < out_size:
-            # Compute linear index for input
             linear_index = i
             for dim in range(len(out_shape) - 1, -1, -1):
                 out_index[dim] = linear_index % out_shape[dim]
                 linear_index //= out_shape[dim]
-
+                
             for dim in range(len(in_shape)):
                 if dim < len(out_shape) and out_shape[dim] == in_shape[dim]:
                     in_index[dim] = out_index[dim]
                 else:
                     in_index[dim] = 0
-
-            # Compute positions in global memory
+                    
             out_pos = 0
             in_pos = 0
             for dim in range(len(out_shape)):
@@ -199,20 +194,8 @@ def tensor_map(
             for dim in range(len(in_shape)):
                 in_pos += in_index[dim] * in_strides[dim]
 
-            # Load the value from input to shared memory
-            shared_memory[local_idx] = in_storage[in_pos]
-        else:
-            # Set shared memory to zero for threads out of bounds
-            shared_memory[local_idx] = 0.0
-
-        # Synchronize threads after loading shared memory
-        cuda.syncthreads()
-
-        # Apply the function to the value in shared memory
-        if i < out_size:
-            out[out_pos] = fn(shared_memory[local_idx])
-
-
+            # Apply the function
+            out[out_pos] = fn(in_storage[in_pos])
       
     return cuda.jit()(_map)  # type: ignore
 
