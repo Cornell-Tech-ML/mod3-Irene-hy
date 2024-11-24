@@ -241,47 +241,47 @@ def tensor_zip(
 
         # TODO: Implement for Task 3.3.
         #raise NotImplementedError("Need to implement for Task 3.3")
-        shared_a = cuda.shared.array(THREADS, numba.float32)
-        shared_b = cuda.shared.array(THREADS, numba.float32)
-
-        # Ensure the thread is within bounds
         if i < out_size:
-            # Map the global thread index to a multidimensional index for the output tensor
+            # Map global index to output multidimensional index
             temp = i
             for dim in range(len(out_shape) - 1, -1, -1):
                 out_index[dim] = temp % out_shape[dim]
                 temp //= out_shape[dim]
 
-            # Map output indices to input indices (with broadcasting logic)
+            # Compute broadcasted indices for `a` and `b`
             for dim in range(len(a_shape)):
-                if dim < len(out_shape) and out_shape[dim] == a_shape[dim]:
-                    a_index[dim] = out_index[dim]
-                else:
-                    a_index[dim] = 0  # Handle broadcasting
-
+                a_index[dim] = (
+                    out_index[dim]
+                    if dim < len(out_shape) and out_shape[dim] == a_shape[dim]
+                    else 0
+                )
             for dim in range(len(b_shape)):
-                if dim < len(out_shape) and out_shape[dim] == b_shape[dim]:
-                    b_index[dim] = out_index[dim]
-                else:
-                    b_index[dim] = 0  # Handle broadcasting
+                b_index[dim] = (
+                    out_index[dim]
+                    if dim < len(out_shape) and out_shape[dim] == b_shape[dim]
+                    else 0
+                )
 
-            # Compute global memory positions for a and b
-            a_pos = sum(a_index[dim] * a_strides[dim] for dim in range(len(a_shape)))
-            b_pos = sum(b_index[dim] * b_strides[dim] for dim in range(len(b_shape)))
+            # Compute flattened positions
+            a_pos = 0
+            for dim in range(len(a_shape)):
+                a_pos += a_index[dim] * a_strides[dim]
 
-            # Load data into shared memory
-            shared_a[cuda.threadIdx.x] = a_storage[a_pos]
-            shared_b[cuda.threadIdx.x] = b_storage[b_pos]
-            cuda.syncthreads()  # Ensure all threads have loaded shared memory
+            b_pos = 0
+            for dim in range(len(b_shape)):
+                b_pos += b_index[dim] * b_strides[dim]
 
-            # Perform computation using shared memory
-            result = fn(shared_a[cuda.threadIdx.x], shared_b[cuda.threadIdx.x])
+            # Compute the output value
+            out_value = fn(a_storage[a_pos], b_storage[b_pos])
 
-            # Compute global memory position for output
-            out_pos = sum(out_index[dim] * out_strides[dim] for dim in range(len(out_shape)))
+            # Compute the output flattened position
+            out_pos = 0
+            for dim in range(len(out_shape)):
+                out_pos += out_index[dim] * out_strides[dim]
 
-            # Write result to output in global memory
-            out[out_pos] = result
+            # Write to the output storage
+            out[out_pos] = out_value
+
 
     return cuda.jit()(_zip)  # type: ignore
 
@@ -586,7 +586,7 @@ def _tensor_matrix_multiply(
     # TODO: Implement for Task 3.4.
     #raise NotImplementedError("Need to implement for Task 3.4")
 
-    
+
     # Initialize the result for C[i, j]
     result = 0.0
 
