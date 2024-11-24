@@ -619,7 +619,7 @@ def _tensor_matrix_multiply(
         #cuda.syncthreads()
 
     # Write the final result to global memory
-    if i < out_shape[-2] and j < out_shape[-1]:
-        out[batch * out_strides[0] + i * out_strides[1] + j] = result
+    #if i < out_shape[-2] and j < out_shape[-1]:
+    #    out[batch * out_strides[0] + i * out_strides[1] + j] = result
 
 tensor_matrix_multiply = jit(_tensor_matrix_multiply)
