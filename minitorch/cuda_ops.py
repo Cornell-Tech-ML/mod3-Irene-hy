@@ -476,47 +476,36 @@ def _mm_practice(out: Storage, a: Storage, b: Storage, size: int) -> None:
     #raise NotImplementedError("Need to implement for Task 3.3")
 
     # Shared memory for A and B matrices
-    a_shared = cuda.shared.array((BLOCK_DIM, BLOCK_DIM), numba.float32)
-    b_shared = cuda.shared.array((BLOCK_DIM, BLOCK_DIM), numba.float32)
+    a_shared = cuda.shared.array((BLOCK_DIM, BLOCK_DIM + 1), numba.float32)
+    b_shared = cuda.shared.array((BLOCK_DIM, BLOCK_DIM + 1), numba.float32)
 
-    # Thread indices
     tx = cuda.threadIdx.x
     ty = cuda.threadIdx.y
-
-    # Global indices
     row = cuda.blockIdx.x * cuda.blockDim.x + tx
     col = cuda.blockIdx.y * cuda.blockDim.y + ty
 
-    # Temporary variable for storing the result
     result = 0.0
 
-    # Loop over tiles
     for k in range(0, size, BLOCK_DIM):
-        # Load a and b tiles into shared memory
-        if row < size and k + ty < size:
+        if row < size and (k + ty) < size:
             a_shared[tx, ty] = a[row * size + (k + ty)]
         else:
             a_shared[tx, ty] = 0.0
 
-        if col < size and k + tx < size:
+        if col < size and (k + tx) < size:
             b_shared[tx, ty] = b[(k + tx) * size + col]
         else:
             b_shared[tx, ty] = 0.0
 
-        # Synchronize threads within a block
         cuda.syncthreads()
 
-        # Compute dot product for this tile
         for n in range(BLOCK_DIM):
             result += a_shared[tx, n] * b_shared[n, ty]
 
-        # Synchronize again to ensure all threads are done before loading new tiles
         cuda.syncthreads()
 
-    # Write result to global memory
     if row < size and col < size:
         out[row * size + col] = result
-
 
 jit_mm_practice = jit(_mm_practice)
 
