@@ -476,7 +476,7 @@ def _mm_practice(out: Storage, a: Storage, b: Storage, size: int) -> None:
     #raise NotImplementedError("Need to implement for Task 3.3")
 
     # Shared memory for A and B matrices
-    a_shared = cuda.shared.array((BLOCK_DIM, BLOCK_DIM), numba.float32)
+     a_shared = cuda.shared.array((BLOCK_DIM, BLOCK_DIM), numba.float32)
     b_shared = cuda.shared.array((BLOCK_DIM, BLOCK_DIM), numba.float32)
 
     # Thread indices
@@ -567,8 +567,8 @@ def _tensor_matrix_multiply(
     batch = cuda.blockIdx.z
 
     BLOCK_DIM = 32
-    a_shared = cuda.shared.array((BLOCK_DIM, BLOCK_DIM), numba.float64)
-    b_shared = cuda.shared.array((BLOCK_DIM, BLOCK_DIM), numba.float64)
+    a_shared = cuda.shared.array((BLOCK_DIM, BLOCK_DIM), numba.float32)
+    b_shared = cuda.shared.array((BLOCK_DIM, BLOCK_DIM), numba.float32)
 
     # The final position c[i, j]
     i = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
