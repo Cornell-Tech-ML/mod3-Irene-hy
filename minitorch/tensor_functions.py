@@ -1,5 +1,4 @@
 """Implementation of the autodifferentiation Functions for Tensor."""
-
 from __future__ import annotations
 
 import random
@@ -12,6 +11,7 @@ import minitorch
 from . import operators
 from .autodiff import Context
 from .tensor_ops import SimpleBackend, TensorBackend
+
 
 if TYPE_CHECKING:
     from typing import Any, List, Tuple
@@ -42,6 +42,7 @@ class Function:
         """Call the forward function and track history"""
         raw_vals = []
         need_grad = False
+        
         for v in vals:
             if v.requires_grad():
                 need_grad = True
@@ -88,11 +89,12 @@ class Inv(Function):
 class Add(Function):
     @staticmethod
     def forward(ctx: Context, t1: Tensor, t2: Tensor) -> Tensor:
+        ctx.save_for_backward(t1, t2)  # Save tensors for backward pass
         return t1.f.add_zip(t1, t2)
 
     @staticmethod
     def backward(ctx: Context, grad_output: Tensor) -> Tuple[Tensor, Tensor]:
-        return grad_output, grad_output
+        return grad_output, grad_output  # Gradient is 1 for addition
 
 
 class All(Function):
@@ -102,9 +104,136 @@ class All(Function):
         if dim is not None:
             return a.f.mul_reduce(a, int(dim.item()))
         else:
-            return a.f.mul_reduce(a.contiguous().view(int(operators.prod(a.shape))), 0)
+            a.f.mul_reduce(a.contiguous().view(int(operators.prod(a.shape))), 0)
+
+# TODO: Implement for Task 2.3.
+
+class Mul(Function):
+    @staticmethod
+    def forward(ctx: Context, a: Tensor, b: Tensor) -> Tensor:
+        ctx.save_for_backward(a, b)  # Save tensors for backward pass
+        return a.f.mul_zip(a, b)
+
+    @staticmethod
+    def backward(ctx: Context, grad_output: Tensor) -> Tuple[Tensor, Tensor]:
+        a, b = ctx.saved_values
+        return (
+            grad_output.f.mul_zip(b, grad_output),
+            grad_output.f.mul_zip(a, grad_output),
+        )
+    
+class Sigmoid(Function):
+    @staticmethod
+    def forward(ctx: Context, t1: Tensor) -> Tensor:
+        out = t1.f.sigmoid_map(t1)
+        ctx.save_for_backward(out)
+        return out
+
+    @staticmethod
+    def backward(ctx: Context, grad_output: Tensor) -> Tensor:
+        sigma: Tensor = ctx.saved_values[0]
+        return sigma * (-sigma + 1.0) * grad_output
 
 
+class ReLU(Function):
+    @staticmethod
+    def forward(ctx: Context, t1: Tensor) -> Tensor:
+        ctx.save_for_backward(t1)
+        return t1.f.relu_map(t1)  # Assuming `relu_map` exists as an element-wise operation
+    
+    @staticmethod
+    def backward(ctx: Context, grad_output: Tensor) -> Tensor:
+        (a,) = ctx.saved_values
+        return grad_output.f.relu_back_zip(a, grad_output)
+
+class Log(Function):
+    @staticmethod
+    def forward(ctx: Context, t1: Tensor) -> Tensor:
+        ctx.save_for_backward(t1)
+        out = t1.f.log_map(t1)
+        return  out # Assuming `log_map` exists for the logarithmic operation
+    
+    @staticmethod
+    def backward(ctx: Context, grad_output: Tensor) -> Tensor:
+        (a,) = ctx.saved_values
+        return grad_output.f.log_back_zip(a, grad_output)
+    
+class Exp(Function):
+    @staticmethod
+    def forward(ctx: Context, t1: Tensor) -> Tensor:
+        out = t1.f.exp_map(t1)
+        ctx.save_for_backward(out)
+        return out  # Assuming `exp_map` exists for exponential calculation
+    
+    @staticmethod
+    def backward(ctx: Context, grad_output: Tensor) -> Tensor:
+        (a,) = ctx.saved_values
+        return grad_output.f.mul_zip(a, grad_output)
+    
+class LT(Function):
+    @staticmethod
+    def forward(ctx: Context, a: Tensor, b: Tensor) -> Tensor:
+        ctx.save_for_backward(a.shape, b.shape)
+        return a.f.lt_zip(a,b)
+        
+    @staticmethod
+    def backward(ctx: Context, grad_output: Tensor) -> Tuple[Tensor, Tensor]:
+#    def backward(ctx: Context, a: Tensor, b: Tensor) -> Tuple[Tensor, Tensor]:
+        a_shape, b_shape = ctx.saved_values
+        return zeros(a_shape), zeros(b_shape)
+    
+class Sum(Function):
+    @staticmethod
+    def forward(ctx: Context, a: Tensor, dim: Tensor) -> Tensor:
+        ctx.save_for_backward(a.shape, dim)
+        return a.f.add_reduce(a, int(dim.item()))
+    
+    @staticmethod
+    def backward(ctx: Context, grad_output: Tensor) -> Tuple[Tensor, float]:
+        a_shape, dim = ctx.saved_values
+        return grad_output, 0.0
+
+class EQ(Function):
+    @staticmethod
+    def forward(ctx: Context, a: Tensor, b: Tensor) -> Tensor:
+        ctx.save_for_backward(a.shape, b.shape)
+        return a.f.eq_zip(a, b)  # Assuming `eq_zip` performs element-wise equality check
+    
+    @staticmethod
+    def backward(ctx: Context, grad_output: Tensor) -> Tuple[Tensor, Tensor]:
+#    def backward(ctx: Context, a: Tensor, b: Tensor) -> Tuple[Tensor, Tensor]:
+        a_shape, b_shape = ctx.saved_values
+        return zeros(a_shape), zeros(b_shape)
+
+    
+class IsClose(Function):
+    @staticmethod
+    def forward(ctx: Context, a: Tensor, b: Tensor) -> Tensor:
+    
+        return a.f.is_close_zip(a, b)
+
+    #@staticmethod
+    #def backward(ctx: Context, grad_output: Tensor) -> Tuple[None, None, None, None]:
+    #    # Since `isclose` is not differentiable, it returns None for the gradient
+    #    return None, None, None, None
+
+class Permute(Function):
+    @staticmethod
+    def forward(ctx: Context, a: Tensor, order: Tensor) -> Tensor:
+        ctx.save_for_backward(order)
+        
+        return a._new(a._tensor.permute(*[int(order[i]) for i in range(order.size)]))  # Assuming `permute` method exists in Tensor for dimension reordering
+
+    @staticmethod
+    def backward(ctx: Context, grad_output: Tensor) -> Tuple[Tensor, float]:
+        order: Tensor = ctx.saved_values[0]
+        order2: List[int] = [
+            a[0]
+            for a in sorted(
+                enumerate([order[i] for i in range(order.size)]), key= lambda a: a[1]
+            )
+        ]
+        return grad_output._new(grad_output._tensor.permute(*order2)), 0.0
 
 
 class View(Function):
