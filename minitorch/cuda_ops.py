@@ -176,27 +176,12 @@ def tensor_map(
         # TODO: Implement for Task 3.3.
         #raise NotImplementedError("Need to implement for Task 3.3")
         if i < out_size:
-            linear_index = i
-            for dim in range(len(out_shape) - 1, -1, -1):
-                out_index[dim] = linear_index % out_shape[dim]
-                linear_index //= out_shape[dim]
-                
-            for dim in range(len(in_shape)):
-                if dim < len(out_shape) and out_shape[dim] == in_shape[dim]:
-                    in_index[dim] = out_index[dim]
-                else:
-                    in_index[dim] = 0
-                    
-            out_pos = 0
-            in_pos = 0
-            for dim in range(len(out_shape)):
-                out_pos += out_index[dim] * out_strides[dim]
-            for dim in range(len(in_shape)):
-                in_pos += in_index[dim] * in_strides[dim]
-
-            # Apply the function
-            out[out_pos] = fn(in_storage[in_pos])
-      
+            to_index(i, out_shape, out_index)
+            broadcast_index(out_index, out_shape, in_shape, in_index)
+            o = index_to_position(out_index, out_strides)
+            j = index_to_position(in_index, in_strides)
+            out[o] = fn(in_storage[j])
+ 
     return cuda.jit()(_map)  # type: ignore
 
 
@@ -242,46 +227,13 @@ def tensor_zip(
         # TODO: Implement for Task 3.3.
         #raise NotImplementedError("Need to implement for Task 3.3")
         if i < out_size:
-            # Map global index to output multidimensional index
-            temp = i
-            for dim in range(len(out_shape) - 1, -1, -1):
-                out_index[dim] = temp % out_shape[dim]
-                temp //= out_shape[dim]
-
-            # Compute broadcasted indices for `a` and `b`
-            for dim in range(len(a_shape)):
-                a_index[dim] = (
-                    out_index[dim]
-                    if dim < len(out_shape) and out_shape[dim] == a_shape[dim]
-                    else 0
-                )
-            for dim in range(len(b_shape)):
-                b_index[dim] = (
-                    out_index[dim]
-                    if dim < len(out_shape) and out_shape[dim] == b_shape[dim]
-                    else 0
-                )
-
-            # Compute flattened positions
-            a_pos = 0
-            for dim in range(len(a_shape)):
-                a_pos += a_index[dim] * a_strides[dim]
-
-            b_pos = 0
-            for dim in range(len(b_shape)):
-                b_pos += b_index[dim] * b_strides[dim]
-
-            # Compute the output value
-            out_value = fn(a_storage[a_pos], b_storage[b_pos])
-
-            # Compute the output flattened position
-            out_pos = 0
-            for dim in range(len(out_shape)):
-                out_pos += out_index[dim] * out_strides[dim]
-
-            # Write to the output storage
-            out[out_pos] = out_value
-
+            to_index(i, out_shape, out_strides)
+            o = index_to_position(out_index, out_strides)
+            broadcast_index(out_index, out_shape, a_shape, a_index)
+            j = index_to_position(a_index, a_strides)
+            broadcast_index(out_index, out_shape, a_shape, a_index)
+            k = index_to_position(b_index, b_strides)
+            out[o] = fn(a_storage[j], b_storage[k])
 
     return cuda.jit()(_zip)  # type: ignore
 
@@ -318,25 +270,21 @@ def _sum_practice(out: Storage, a: Storage, size: int) -> None:
     # TODO: Implement for Task 3.3.
     #raise NotImplementedError("Need to implement for Task 3.3")
     if i < size:
-        cache[pos] = a[i]
+        val = float(a[i])
+        cache[pos] = val
+        cuda.syncthreads()
     else:
         cache[pos] = 0.0  # Padding for out-of-bounds threads
 
-    # Synchronize threads to ensure all values are loaded into shared memory
-    cuda.syncthreads()
+    if i < size:
+        for j in [1,2,4,8,16]:
+            if pos % (j * 2) == 0:
+                cache[pos] += cache[pos + j]
+                cuda.syncthreads()
 
-    # Perform block-wide reduction using shared memory
-    stride = 1
-    while stride < BLOCK_DIM:
-        if pos % (2 * stride) == 0 and pos + stride < BLOCK_DIM:
-            cache[pos] += cache[pos + stride]
-        stride *= 2
-        cuda.syncthreads()
-
-    # Write the result for this block to the output tensor
-    if pos == 0:
-        out[cuda.blockIdx.x] = cache[0]    
-
+        # Write the result for this block to the output tensor
+        if pos == 0:
+            out[cuda.blockIdx.x] = cache[0]    
 
 jit_sum_practice = cuda.jit()(_sum_practice)
 
