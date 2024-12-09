@@ -227,7 +227,7 @@ def tensor_zip(
         # TODO: Implement for Task 3.3.
         #raise NotImplementedError("Need to implement for Task 3.3")
         if i < out_size:
-            to_index(i, out_shape, out_strides)
+            to_index(i, out_shape, out_index)
             o = index_to_position(out_index, out_strides)
             broadcast_index(out_index, out_shape, a_shape, a_index)
             j = index_to_position(a_index, a_strides)
@@ -359,7 +359,7 @@ def tensor_reduce(
             if pos == 0:
                 out[o] = cache[0]
  
-    return jit(_reduce)  # type: ignore
+    return cuda.jit()(_reduce)  # type: ignore
 
 
 def _mm_practice(out: Storage, a: Storage, b: Storage, size: int) -> None:
@@ -514,4 +514,4 @@ def _tensor_matrix_multiply(
     if i < out_shape[1] and j < out_shape[2]:
         out[out_strides[0] * batch + out_strides[1] * i + out_strides[2] * j] = accum
 
-tensor_matrix_multiply = jit(_tensor_matrix_multiply)
+tensor_matrix_multiply = cuda.jit(_tensor_matrix_multiply)
