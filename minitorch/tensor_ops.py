@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Callable, Optional, Type
 
 import numpy as np
 from typing_extensions import Protocol
+from .tensor_data import TensorData
 
 from . import operators
 from .tensor_data import (
@@ -17,7 +18,6 @@ from .tensor_data import (
 if TYPE_CHECKING:
     from .tensor import Tensor
     from .tensor_data import Index, Shape, Storage, Strides
-
 
 class MapProto(Protocol):
     def __call__(self, x: Tensor, out: Optional[Tensor] = ..., /) -> Tensor:
@@ -212,8 +212,9 @@ class SimpleOps(TensorOps):
             out._tensor._storage[:] = start
 
             f(*out.tuple(), *a.tuple(), dim)
+            
             return out
-
+        
         return ret
 
     @staticmethod
@@ -227,9 +228,7 @@ class SimpleOps(TensorOps):
 # Implementations.
 
 
-def tensor_map(
-    fn: Callable[[float], float],
-) -> Callable[[Storage, Shape, Strides, Storage, Shape, Strides], None]:
+def tensor_map(fn: Callable[[float], float]) -> Any:
     """Low-level implementation of tensor map between
     tensors with *possibly different strides*.
 
@@ -261,16 +260,25 @@ def tensor_map(
         in_shape: Shape,
         in_strides: Strides,
     ) -> None:
-        raise NotImplementedError("Need to include this file from past assignment.")
-
+        # TODO: Implement for Task 2.3.
+        #raise NotImplementedError("Need to implement for Task 2.3")
+        """Applies the function `fn` to each element of the input tensor (`in_storage`)
+        and stores the result in the output tensor (`out`) based on the broadcasted shapes
+        and strides.
+        """
+        # Initialize the index array for the input tensor
+        out_index: Index = np.zeros(MAX_DIMS, np.int16)
+        in_index: Index = np.zeros(MAX_DIMS, np.int16)
+        for i in range(len(out)):
+            to_index(i, out_shape, out_index)
+            broadcast_index(out_index, out_shape, in_shape, in_index)
+            o = index_to_position(out_index, out_strides)
+            j = index_to_position(in_index, in_strides)
+            out[o] = fn(in_storage[j])
     return _map
 
 
-def tensor_zip(
-    fn: Callable[[float, float], float],
-) -> Callable[
-    [Storage, Shape, Strides, Storage, Shape, Strides, Storage, Shape, Strides], None
-]:
+def tensor_zip(fn: Callable[[float, float], float]) -> Any:
     """Low-level implementation of tensor zip between
     tensors with *possibly different strides*.
 
@@ -304,15 +312,29 @@ def tensor_zip(
         b_storage: Storage,
         b_shape: Shape,
         b_strides: Strides,
+        
     ) -> None:
-        raise NotImplementedError("Need to include this file from past assignment.")
+        # TODO: Implement for Task 2.3.
+        #raise NotImplementedError("Need to implement for Task 2.3")
+        # Initialize index arrays for input tensors
+        out_index: Index = np.zeros(MAX_DIMS, np.int32)
+        a_index: Index = np.zeros(MAX_DIMS, np.int32)
+        b_index: Index = np.zeros(MAX_DIMS, np.int32)
+
+        # Iterate over each element in the output storage by its flat position
+        for i in range(len(out)):
+            to_index(i, out_shape, out_index)
+            o = index_to_position(out_index, out_strides)
+            broadcast_index(out_index, out_shape, a_shape, a_index)
+            j = index_to_position(a_index, a_strides)
+            broadcast_index(out_index, out_shape, b_shape, b_index)
+            k = index_to_position(b_index, b_strides)
+            out[o] = fn(a_storage[j], b_storage[k])
 
     return _zip
 
 
-def tensor_reduce(
-    fn: Callable[[float, float], float],
-) -> Callable[[Storage, Shape, Strides, Storage, Shape, Strides, int], None]:
+def tensor_reduce(fn: Callable[[float, float], float]) -> Any: 
     """Low-level implementation of tensor reduce.
 
     * `out_shape` will be the same as `a_shape`
@@ -335,8 +357,19 @@ def tensor_reduce(
         a_strides: Strides,
         reduce_dim: int,
     ) -> None:
-        raise NotImplementedError("Need to include this file from past assignment.")
-
+        # TODO: Implement for Task 2.3.
+        #raise NotImplementedError("Need to implement for Task 2.3")
+        # Initialize the index array for `a_storage`
+        
+        out_index: Index = np.zeros(MAX_DIMS, np.int32)
+        reduce_size = a_shape[reduce_dim]
+        for i in range(len(out)):
+            to_index(i, out_shape, out_index)
+            o = index_to_position(out_index, out_strides)
+            for s in range(reduce_size):
+                out_index[reduce_dim] = s
+                j = index_to_position(out_index, a_strides)
+                out[o] = fn(out[o], a_storage[j])
     return _reduce
 
 

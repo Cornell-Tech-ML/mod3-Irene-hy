@@ -60,8 +60,8 @@ class Scalar:
     data: float
     history: Optional[ScalarHistory] = field(default_factory=ScalarHistory)
     derivative: Optional[float] = None
-    name: str = field(default="")
-    unique_id: int = field(default=0)
+    name: str = field(default=" ")
+    unique_id: int = field(init=False, default=0)
 
     def __post_init__(self):
         global _var_count
@@ -116,7 +116,9 @@ class Scalar:
 
     @property
     def parents(self) -> Iterable[Variable]:
-        """Get the variables used to create this one."""
+        """docstring: assert self.history is not none
+        return self.history.input
+        """
         assert self.history is not None
         return self.history.inputs
 
@@ -126,7 +128,12 @@ class Scalar:
         assert h.last_fn is not None
         assert h.ctx is not None
 
-        raise NotImplementedError("Need to include this file from past assignment.")
+        # TODO: Implement for Task 1.3.
+
+        x = h.last_fn._backward(h.ctx, d_output)
+        return list(zip(h.inputs, x))
+
+        # raise NotImplementedError("Need to implement for Task 1.3")
 
     def backward(self, d_output: Optional[float] = None) -> None:
         """Calls autodiff to fill in the derivatives for the history of this object.
@@ -141,7 +148,39 @@ class Scalar:
             d_output = 1.0
         backpropagate(self, d_output)
 
-    raise NotImplementedError("Need to include this file from past assignment.")
+    # TODO: Implement for Task 1.2.
+
+    def __add__(self, b: ScalarLike) -> Scalar:
+        return Add.apply(self, b)
+
+    def __lt__(self, b: ScalarLike) -> Scalar:
+        return LT.apply(self, b)
+
+    def __gt__(self, b: ScalarLike) -> Scalar:
+        return LT.apply(b, self)
+
+    def __eq__(self, b: ScalarLike) -> Scalar:
+        return EQ.apply(b, self)
+
+    def __sub__(self, b: ScalarLike) -> Scalar:
+        return Add.apply(self, -b)
+
+    def __neg__(self) -> Scalar:
+        return Neg.apply(self)
+
+    def log(self) -> Scalar:
+        return Log.apply(self)
+
+    def exp(self) -> Scalar:
+        return Exp.apply(self)
+
+    def sigmoid(self) -> Scalar:
+        return Sigmoid.apply(self)
+
+    def relu(self) -> Scalar:
+        return ReLU.apply(self)
+
+    # raise NotImplementedError("Need to implement for Task 1.2")
 
 
 def derivative_check(f: Any, *scalars: Scalar) -> None:
@@ -154,6 +193,7 @@ def derivative_check(f: Any, *scalars: Scalar) -> None:
         *scalars  : n input scalar values.
 
     """
+    print(f"\n{f}")
     out = f(*scalars)
     out.backward()
 
