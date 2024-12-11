@@ -492,13 +492,13 @@ def _tensor_matrix_multiply(
 
     # Move across shared dimension in tiles of BLOCK_DIM
     for k_start in range(0, a_shape[2], BLOCK_DIM):
-        k + k_start + pj
+        k = k_start + pj
         # Load A tile into shared memory
         if i < a_shape[1] and k < a_shape[2]:
             a_shared[pi, pj] = a_storage[
                 a_batch_stride * batch + a_strides[1] * i + a_strides[2] * k
             ]
-        k + k_start + pi 
+        k = k_start + pi 
         if j < b_shape[2] and k < b_shape[1]:
             b_shared[pi, pj] = b_storage[
                 b_batch_stride * batch + b_strides[1] * k + b_strides[2] * j
